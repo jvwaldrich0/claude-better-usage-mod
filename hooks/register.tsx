@@ -625,6 +625,27 @@ function bandActions($: EngineInterface): BandActions {
   }
 }
 
+// the band's view, shared by its two parts (above and under the prompt)
+async function bandView($: EngineInterface, snap: Snapshot) {
+  const auto = await read($, autoCompact)
+  return {
+    snap,
+    now: await $.clock.now(),
+    isLight: (await read($, theme)) === 'light',
+    collapsed: await read($, isCollapsed),
+    auto,
+    ask: await read($, autoAsk),
+    tick: await read($, fieldTick),
+    spent: await read($, spend),
+    drawnAt: (await read($, fieldText)) ?? `${auto.at ?? settings.autoCompactAt}`,
+    limitRamp: settings.limitRamp,
+    contextRamp: settings.contextRamp,
+    chatCost: settings.chatCost,
+    t: stringsOf(await read($, language)),
+    isHitDown,
+  }
+}
+
 export const register: Register = (on, options) => {
   settings = readSettings(options)
 
@@ -772,28 +793,34 @@ export const register: Register = (on, options) => {
     }, (field, value) => void setSetting($, field, value))
   })
 
+  // the prompt's width as the band last saw it: the line under the prompt is told none
+  let promptColumns = 80
+
+  // above the prompt: the headline, with Auto compact and Compact beside it
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     // the band is raised on these two alone; the check narrows the elements' table
     if (e.surface !== 'terminal' && e.surface !== 'desktop') return next(e)
     if (e.props.hasSurvey || !(await read($, isOn))) return next(e)
     const snap = await read($, snapshot)
     if (!snap) return next(e)
-    const auto = await read($, autoCompact)
-    return bandTree($.ui.resolve(e), e.surface, Math.max(20, e.props.bodyColumns), {
-      snap,
-      now: await $.clock.now(),
-      isLight: (await read($, theme)) === 'light',
-      collapsed: await read($, isCollapsed),
-      auto,
-      ask: await read($, autoAsk),
-      tick: await read($, fieldTick),
-      spent: await read($, spend),
-      drawnAt: (await read($, fieldText)) ?? `${auto.at ?? settings.autoCompactAt}`,
-      limitRamp: settings.limitRamp,
-      contextRamp: settings.contextRamp,
-      chatCost: settings.chatCost,
-      t: stringsOf(await read($, language)),
-      isHitDown,
-    }, bandActions($))
+    promptColumns = Math.max(20, e.props.bodyColumns)
+    return bandTree($.ui.resolve(e), e.surface, promptColumns, await bandView($, snap), bandActions($), 'top')
+  })
+
+  // under the prompt: the row of limits, then the app's own hint line
+  on('ui.render', { component: 'PromptHint' }, async ($, e, next) => {
+    if (e.surface !== 'terminal' && e.surface !== 'desktop') return next(e)
+    if (!(await read($, isOn))) return next(e)
+    const snap = await read($, snapshot)
+    if (!snap || snap.limits.length === 0) return next(e)
+    const hint = await next(e)
+    const table = $.ui.resolve(e)
+    const { Box } = table
+    return (
+      <Box flexDirection="column">
+        {bandTree(table, e.surface, promptColumns, await bandView($, snap), bandActions($), 'bottom')}
+        {hint}
+      </Box>
+    )
   })
 }

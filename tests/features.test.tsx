@@ -1,5 +1,6 @@
 import { expect, mock, test } from 'claude-code/testing'
 import type { On, SessionRateLimit, SessionUsage } from 'claude-code'
+import { mountBand } from './mount-band'
 
 import { chatColors, DARK } from '../hooks/colors'
 import { LANGUAGES } from '../hooks/i18n'
@@ -246,11 +247,11 @@ test('the band speaks the language set: Turkish words, Turkish times', { options
   await $.session.start({ cwd: '.', surface: 'desktop', isInteractive: true })
   expect(said.commands[0]?.description).toBe('Kullanım şeridini aç veya kapat')
   for (const surface of SURFACES) {
-    const ui = await $.ui.mount({ plugin: 'usage-quota', surface, component: 'AbovePrompt', props: PROPS })
+    const ui = await mountBand($, { plugin: 'usage-quota', surface, component: 'AbovePrompt', props: PROPS })
     // NOW is a Sunday: Weekly, on course to run out, resets on Friday ("Cuma")
     expect(await ui.find({ type: 'Text', text: 'Bu hızla Cuma günkü sıfırlamadan önce limitin dolacak.' })).toBeDefined()
-    expect(await ui.find({ type: 'Text', text: '5 Saat' })).toBeDefined()
-    expect(await ui.find({ type: 'Text', text: 'Haftalık' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: '5S' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: 'H' })).toBeDefined()
     expect(await ui.find({ type: 'Button', label: 'Sıkıştır' } as never)).toBeDefined()
     await ui.unmount()
   }
@@ -263,8 +264,8 @@ test("set to auto, the band follows the desktop app's language", async ($, on) =
   on('fs.stat', () => ({ value: { kind: 'file', size: 100, mtimeMs: 1, isLink: false } }) as never)
   on('fs.read', () => ({ value: JSON.stringify({ userThemeMode: 'dark', locale: 'de-DE' }) }) as never)
   await $.session.start({ cwd: '.', surface: 'desktop', isInteractive: true })
-  const ui = await $.ui.mount({ plugin: 'usage-quota', surface: 'desktop', component: 'AbovePrompt', props: PROPS })
-  expect(await ui.find({ type: 'Text', text: 'Wöchentlich' })).toBeDefined()
+  const ui = await mountBand($, { plugin: 'usage-quota', surface: 'desktop', component: 'AbovePrompt', props: PROPS })
+  expect(await ui.find({ type: 'Text', text: 'W' })).toBeDefined()
   await ui.unmount()
 })
 
@@ -323,7 +324,7 @@ test('the settings move the colours and can hide what the chat used', { options:
   state.limits = [{ kind: 'five_hour', percentUsed: 30, resetsAt: iso(3 * HOUR) }]
   await clock.advance(1_000)
   await $.turn.complete({ answer: 'done', durationMs: 1_000, isAborted: false, turnId: 't1', reason: 'answer' } as never)
-  const ui = await $.ui.mount({ plugin: 'usage-quota', surface: 'desktop', component: 'AbovePrompt', props: PROPS })
+  const ui = await mountBand($, { plugin: 'usage-quota', surface: 'desktop', component: 'AbovePrompt', props: PROPS })
   // red at 30% by these settings, not grey
   expect((await ui.find({ type: 'Text', text: '30%' }))?.props.color).not.toBe(GREY)
   expect((await ui.find({ type: 'Text', text: '30%' }))?.props.color).toBe('#d47a6f')

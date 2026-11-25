@@ -168,7 +168,14 @@ function cellRuns(f: Forecast, cells: number, fill: string, c: Palette): { color
 // plain glyphs every font has (WGL4), drawn grey: ○ the 5 hour window, ● the weekly
 const windowIcon = (kind: string) => (kind === 'five_hour' ? '○' : kind === 'seven_day' ? '●' : '•')
 
-export function bandTree(table: ElementTable<'terminal' | 'desktop'>, surface: RenderSurface, width: number, view: BandView, act: BandActions) {
+/**
+ * The band in two parts: `top`, above the prompt, is the headline with Auto compact and
+ * Compact beside it (and the auto compact question); `bottom`, under the prompt, is the
+ * one row of limits.
+ */
+export type BandPart = 'top' | 'bottom'
+
+export function bandTree(table: ElementTable<'terminal' | 'desktop'>, surface: RenderSurface, width: number, view: BandView, act: BandActions, part: BandPart = 'top') {
   const { snap, now, collapsed, auto, ask, tick, spent, drawnAt, t } = view
   const { Box, Text, Button, Input, Client } = table
   // thin Svg bars on the desktop alone: the terminal draws coloured cells
@@ -283,12 +290,6 @@ export function bandTree(table: ElementTable<'terminal' | 'desktop'>, surface: R
       <Box key="compactBox" marginLeft={isHeadBeside ? 2 : 0}>
         <Button key="compact" label={t.compact} hover={{ backgroundColor: c.compactLit }} onPress={() => act.compact()} />
       </Box>
-      <Button
-        key="collapse"
-        label={collapsed ? '▲' : '▼'}
-        plain
-        onPress={() => act.collapse()}
-      />
     </Box>
   )
   const gap = Svg ? 0.5 : 1
@@ -454,39 +455,40 @@ export function bandTree(table: ElementTable<'terminal' | 'desktop'>, surface: R
     </Box>
   )
 
+  // under the prompt: the limits on one row (each on its own row when narrow)
+  if (part === 'bottom') return collapsedBlock
+
   return (
     <Box flexDirection="column">
       {isHeadBeside ? (
-        <Box flexDirection="row" justifyContent="flex-start" alignItems="center" columnGap={3} marginBottom={gap} paddingRight={HOST_HIDE}>
+        <Box flexDirection="row" justifyContent="flex-start" alignItems="center" columnGap={3} paddingRight={HOST_HIDE}>
           <Box flexShrink={1}>{headText}</Box>
           {controls}
         </Box>
       ) : (
-        <Box flexDirection="column" marginBottom={gap}>
+        <Box flexDirection="column">
           <Box paddingRight={HOST_HIDE}>{headText}</Box>
           <Box marginTop={gap}>{controls}</Box>
         </Box>
       )}
 
+      {/* no reading yet, or the usage service failing: said under the headline */}
+      {limits.length === 0 ? <Text color={c.muted} wrap="wrap">{t.noLimits}</Text> : null}
+      {stale ? <Text color={c.yellow} wrap="wrap">{stale}</Text> : null}
+
       {ask ? (
         isAskLine ? (
-          <Box flexDirection="row" alignItems="center" columnGap={1} marginBottom={gap}>
+          <Box flexDirection="row" alignItems="center" columnGap={1} marginTop={gap}>
             <Box flexShrink={1}>{askText}</Box>
             {askButtons}
           </Box>
         ) : (
-          <Box flexDirection="column" marginBottom={gap}>
+          <Box flexDirection="column" marginTop={gap}>
             {askText}
             <Box marginTop={gap}>{askButtons}</Box>
           </Box>
         )
       ) : null}
-
-      {collapsed ? (
-        collapsedBlock
-      ) : (
-        limitsBlock
-      )}
     </Box>
   )
 }
