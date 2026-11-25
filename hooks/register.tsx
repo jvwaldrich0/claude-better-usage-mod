@@ -804,12 +804,25 @@ export const register: Register = (on, options) => {
     const snap = await read($, snapshot)
     if (!snap) return next(e)
     promptColumns = Math.max(20, e.props.bodyColumns)
-    return bandTree($.ui.resolve(e), e.surface, promptColumns, await bandView($, snap), bandActions($), 'top')
+    const table = $.ui.resolve(e)
+    const view = await bandView($, snap)
+    const top = bandTree(table, e.surface, promptColumns, view, bandActions($), 'top')
+    // the desktop app draws its own prompt box and never asks for the line under it:
+    // there the limits row sits in the band, right under the headline
+    if (e.surface !== 'desktop' || snap.limits.length === 0) return top
+    const { Box } = table
+    return (
+      <Box flexDirection="column" rowGap={0.5}>
+        {top}
+        {bandTree(table, e.surface, promptColumns, view, bandActions($), 'bottom')}
+      </Box>
+    )
   })
 
-  // under the prompt: the row of limits, then the app's own hint line
+  // under the prompt, in the terminal: the row of limits, then the app's own hint line
   on('ui.render', { component: 'PromptHint' }, async ($, e, next) => {
-    if (e.surface !== 'terminal' && e.surface !== 'desktop') return next(e)
+    // the terminal alone: the desktop draws the row in the band (above)
+    if (e.surface !== 'terminal') return next(e)
     if (!(await read($, isOn))) return next(e)
     const snap = await read($, snapshot)
     if (!snap || snap.limits.length === 0) return next(e)
