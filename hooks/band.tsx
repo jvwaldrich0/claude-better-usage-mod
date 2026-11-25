@@ -165,6 +165,9 @@ function cellRuns(f: Forecast, cells: number, fill: string, c: Palette): { color
   return runs
 }
 
+// plain glyphs every font has (WGL4), drawn grey: ○ the 5 hour window, ● the weekly
+const windowIcon = (kind: string) => (kind === 'five_hour' ? '○' : kind === 'seven_day' ? '●' : '•')
+
 export function bandTree(table: ElementTable<'terminal' | 'desktop'>, surface: RenderSurface, width: number, view: BandView, act: BandActions) {
   const { snap, now, collapsed, auto, ask, tick, spent, drawnAt, t } = view
   const { Box, Text, Button, Input, Client } = table
@@ -172,7 +175,7 @@ export function bandTree(table: ElementTable<'terminal' | 'desktop'>, surface: R
   const Svg = surface === 'desktop' && 'Svg' in table ? table.Svg : undefined
   // the light palette is the desktop's alone: the terminal keeps its own colours
   const c = surface === 'desktop' && view.isLight ? LIGHT : DARK
-  const limitColor = (p: number) => rampColor(p, view.limitRamp, c)
+  const limitColor = (p: number) => rampColor(p, view.limitRamp, c, c.green)
   // both windows always, once there is any reading: one the reading lacks is not running
   const known = snap.limits.length === 0 ? [] : Object.keys(WINDOWS).map(kind => snap.limits.find(l => l.kind === kind) ?? { kind, percentUsed: 0 })
   const list = known.map(l => forecast(l, now, snap.pace?.[l.kind])).filter((f): f is Forecast => f !== null)
@@ -212,7 +215,7 @@ export function bandTree(table: ElementTable<'terminal' | 'desktop'>, surface: R
   const column = isSplit ? Math.floor((width - 4) / 2) : width
   // the limit bars fill their column: less the label (as wide as the longest name, 8 at
   // least) and the % (2 + 4)
-  const labelCells = Math.max(8, ...Object.keys(WINDOWS).map(kind => cellsOf(windowName(kind, t)) + 1))
+  const labelCells = Math.max(8, ...Object.keys(WINDOWS).map(kind => cellsOf(windowName(kind, t)) + 3))
   const cells = Math.max(6, column - labelCells - 6)
   // collapsed: the three bars in one row, or each on a row of its own
   const isOneRow = width >= 72
@@ -365,6 +368,7 @@ export function bandTree(table: ElementTable<'terminal' | 'desktop'>, surface: R
           <Box flexDirection="column">
             <Box flexDirection="row">
               <Box width={labelCells} flexShrink={0}>
+                <Text color={c.muted}>{`${windowIcon(f.kind)} `}</Text>
                 <Text bold wrap="truncate-end">{label}</Text>
               </Box>
               {bar(fmt(t.barUsed, { label, percent: Math.round(f.percent) }), limitSegments(f), cells, f)}

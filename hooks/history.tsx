@@ -124,7 +124,7 @@ export function historyTree(table: ElementTable<RenderSurface>, surface: RenderS
 
   const windowRow = (row: Row) => {
     const isOpen = view.open.includes(row.key)
-    const fill = rampColor(row.peak, view.ramp, c)
+    const fill = rampColor(row.peak, view.ramp, c, c.green)
     const percent = `${Math.round(row.peak)}%`
     return (
       <Box key={row.key} flexDirection="column">

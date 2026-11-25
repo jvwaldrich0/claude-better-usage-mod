@@ -1,8 +1,9 @@
 // Two palettes, the desktop's dark and light themes, in Claude's own neutral greys.
-// Usage is grey until it matters, then turns smoothly to yellow and on to red.
+// Limits are green while usage is low, then turn smoothly to yellow and on to red;
+// the context stays grey until it matters.
 export type Palette = {
   /** the base grey: muted text, a bar at low usage, the forecast tick on track */
-  muted: string; yellow: string; red: string; free: string; buffer: string; track: string
+  muted: string; green: string; yellow: string; red: string; free: string; buffer: string; track: string
   /** the forecast tick on track: apart from the grey fill it may sit right beside */
   tick: string
   palette: string[]; named: Record<string, string>; switchOff: string; switchOn: string; compactLit: string
@@ -11,7 +12,7 @@ export type Palette = {
 }
 
 export const DARK: Palette = {
-  muted: '#9b9a96', yellow: '#e5b54a', red: '#e5534b',
+  muted: '#9b9a96', green: '#4ade80', yellow: '#e5b54a', red: '#e5534b',
   free: '#333332', buffer: '#4d4d4a', track: '#333332', tick: '#dcdbd6',
   palette: ['#a78bfa', '#60a5fa', '#f472b6', '#34d399', '#fbbf24', '#fb923c', '#22d3ee', '#c084fc'],
   named: {
@@ -24,7 +25,7 @@ export const DARK: Palette = {
 
 // light: the same hues, deep enough to read as text on the pale band; the tracks pale
 export const LIGHT: Palette = {
-  muted: '#73726c', yellow: '#c98a04', red: '#dc3c34',
+  muted: '#73726c', green: '#16a34a', yellow: '#c98a04', red: '#dc3c34',
   free: '#ffffff', buffer: '#c4c3be', track: '#ffffff', tick: '#3d3c38',
   palette: ['#8b5cf6', '#3b82f6', '#ec4899', '#10b981', '#f59e0b', '#f97316', '#0ea5e9', '#a855f7'],
   named: {
@@ -49,9 +50,9 @@ export function chatColors(chats: string[], c: Palette): Map<string, string> {
   }))
 }
 
-/** grey up to the first %, fully yellow at the second, fully red at the third */
+/** `low` (grey, or green for the limits) up to the first %, fully yellow at the second, fully red at the third */
 export type Ramp = readonly [number, number, number]
-export const LIMIT_RAMP: Ramp = [50, 75, 95]
+export const LIMIT_RAMP: Ramp = [60, 70, 85]
 export const CONTEXT_RAMP: Ramp = [25, 50, 80]
 
 const channels = (hex: string) => [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16))
@@ -62,10 +63,11 @@ export function mix(a: string, b: string, t: number): string {
 }
 
 // by the % as the band shows it (rounded), so a "75%" is always the same colour
-export function rampColor(percent: number, [from, mid, to]: Ramp, c: Palette): string {
+export function rampColor(percent: number, [from, mid, to]: Ramp, c: Palette, low: string = c.muted): string {
   const p = Math.round(percent)
-  // written as "not above" so an unreadable % (NaN) stays grey
-  if (!(p > from)) return c.muted
-  if (p <= mid) return mix(c.muted, c.yellow, (p - from) / (mid - from))
+  // an unreadable % (NaN) stays grey
+  if (Number.isNaN(p)) return c.muted
+  if (!(p > from)) return low
+  if (p <= mid) return mix(low, c.yellow, (p - from) / (mid - from))
   return mix(c.yellow, c.red, Math.min(1, (p - mid) / (to - mid)))
 }

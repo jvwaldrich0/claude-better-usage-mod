@@ -10,6 +10,7 @@ const PILL = { type: 'down', x: 1, y: 0, button: 'left' } as const
 
 // the dark palette's grey, yellow and red (hooks/colors.ts)
 const GREY = '#9b9a96'
+const GREEN = '#4ade80'
 const YELLOW = '#e5b54a'
 const RED = '#e5534b'
 
@@ -145,12 +146,12 @@ test('draws the band on track', async ($, on) => {
       expect(svgs[1]?.props.alt).toMatch(/^Weekly/)
       expect(svgs[2]?.props.alt).toMatch(/^Context/)
       expect(svgs[2]?.props.height).toBe(7.5)
-      expect(String(svgs[0]?.props.source)).toContain(`fill="${GREY}"`)
-      expect(String(svgs[1]?.props.source)).toContain(`fill="${GREY}"`)
+      expect(String(svgs[0]?.props.source)).toContain(`fill="${GREEN}"`)
+      expect(String(svgs[1]?.props.source)).toContain(`fill="${GREEN}"`)
       expect(boxes.filter(b => typeof b.props.flexGrow === 'number')).toHaveLength(0)
     } else {
-      // 5 hour at 8% (1 cell) with its tick near 32% (cell 5), on the terminal
-      const cells = boxes.filter(b => b.props.backgroundColor === GREY)
+      // 5 hour at 8% (1 cell, green: low usage) with its tick near 32% (cell 5), on the terminal
+      const cells = boxes.filter(b => b.props.backgroundColor === GREEN || b.props.backgroundColor === '#dcdbd6')
       expect(cells.length).toBeGreaterThanOrEqual(2)
       // 4 bar segments: Messages, Tools, Other with the buffer as one grey run, free
       expect(boxes.filter(b => typeof b.props.flexGrow === 'number')).toHaveLength(4)
@@ -572,7 +573,7 @@ test('the arrow collapses the band to one row of three bars, and back', async ($
     // the forecast tick stays on the limit bars
     if (surface === 'desktop') {
       const weekly = (await ui.findAll({ type: 'Svg' })).find(svg => /^Weekly/.test(String(svg.props.alt)))
-      expect(String(weekly?.props.source)).toContain(`fill="${GREY}"`)
+      expect(String(weekly?.props.source)).toContain(`fill="${GREEN}"`)
     }
     await ui.press({ key: 'collapse' })
     expect(await ui.find({ text: 'Messages' })).toBeDefined()
@@ -873,10 +874,10 @@ test('the desktop in light mode draws in the light palette', async ($, on) => {
   await $.session.start({ cwd: '.', surface: 'desktop', isInteractive: true })
   await clock.advance(2_000)
   const ui = await $.ui.mount({ plugin: 'usage-quota', surface: 'desktop', component: 'AbovePrompt', props: PROPS })
-  // the light theme's grey, deep enough to read on the pale band
-  expect((await ui.find({ type: 'Text', text: /^On track\./ }))?.props.color).toBe('#73726c')
+  // the light theme's green, deep enough to read on the pale band
+  expect((await ui.find({ type: 'Text', text: /^On track\./ }))?.props.color).toBe('#16a34a')
   const weeklyBar = (await ui.findAll({ type: 'Svg' })).find(svg => /^Weekly/.test(String(svg.props.alt)))
-  expect(String(weeklyBar?.props.source)).toContain('fill="#73726c"')
+  expect(String(weeklyBar?.props.source)).toContain('fill="#16a34a"')
   const before = reads
   await clock.advance(10_000)
   expect(reads).toBe(before)
@@ -1009,7 +1010,7 @@ test('on by the default alone, the first reading past the % asks even when the c
   await ui.unmount()
 })
 
-test('34% a quarter hour into a 5 hour window is no run-out alarm: grey bar, grey headline', async ($, on) => {
+test('34% a quarter hour into a 5 hour window is no run-out alarm: green bar, green headline', async ($, on) => {
   // alone, 34% in 15 minutes runs to 680%; the window's own pace counts for nothing yet
   world(on, [
     { kind: 'five_hour', percentUsed: 34, resetsAt: iso(5 * HOUR - 15 * MIN) },
@@ -1019,9 +1020,9 @@ test('34% a quarter hour into a 5 hour window is no run-out alarm: grey bar, gre
   for (const surface of SURFACES) {
     const ui = await $.ui.mount({ plugin: 'usage-quota', surface, component: 'AbovePrompt', props: PROPS })
     expect(await ui.find({ text: /run out/ })).toBeUndefined()
-    expect((await ui.find({ type: 'Text', text: /^On track\./ }))?.props.color).toBe(GREY)
-    expect((await ui.find({ type: 'Text', text: '34%' }))?.props.color).toBe(GREY)
-    expect((await ui.find({ type: 'Text', text: '45%' }))?.props.color).toBe(GREY)
+    expect((await ui.find({ type: 'Text', text: /^On track\./ }))?.props.color).toBe(GREEN)
+    expect((await ui.find({ type: 'Text', text: '34%' }))?.props.color).toBe(GREEN)
+    expect((await ui.find({ type: 'Text', text: '45%' }))?.props.color).toBe(GREEN)
     await ui.unmount()
   }
 })
@@ -1151,7 +1152,7 @@ test("a newer reply figure below the usage service's never pulls the band under 
   await ui.unmount()
 })
 
-test('a limit bar and its % stay grey to 50% used, turn yellow by 75% and red by 95%, even on track', async ($, on) => {
+test('a limit bar and its % stay green to 60% used, turn yellow by 70% and red by 85%, even on track', async ($, on) => {
   const clock = mock.clock(on, { now: NOW })
   mock.store(on)
   const state = { percent: 50 }
@@ -1159,7 +1160,7 @@ test('a limit bar and its % stay grey to 50% used, turn yellow by 75% and red by
   on('session.usage', () => ({ value: usage([{ kind: 'seven_day', percentUsed: state.percent, resetsAt: iso(2 * HOUR) }]) }))
   answerRest(on, [])
   // between the stops the colour blends: 60% is 40% of the way to yellow, 85% halfway to red
-  for (const [percent, color] of [[50, GREY], [60, '#b9a578'], [75, YELLOW], [85, '#e5844b'], [95, RED]] as const) {
+  for (const [percent, color] of [[60, GREEN], [65, '#98ca65'], [70, YELLOW], [78, '#e5814b'], [85, RED]] as const) {
     state.percent = percent
     await clock.advance(1_000)
     await $.session.measure(MEASURE)

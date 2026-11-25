@@ -13,23 +13,25 @@ const MIN = 60_000
 const HOUR = 60 * MIN
 const iso = (ms: number) => new Date(NOW + ms).toISOString()
 
-test('the ramp is grey up to its first stop, yellow at its second, red from its third', async () => {
-  expect(rampColor(0, LIMIT_RAMP, DARK)).toBe(DARK.muted)
-  expect(rampColor(50, LIMIT_RAMP, DARK)).toBe(DARK.muted)
-  expect(rampColor(75, LIMIT_RAMP, DARK)).toBe(DARK.yellow)
-  expect(rampColor(95, LIMIT_RAMP, DARK)).toBe(DARK.red)
-  expect(rampColor(100, LIMIT_RAMP, DARK)).toBe(DARK.red)
-  expect(rampColor(NaN, LIMIT_RAMP, DARK)).toBe(DARK.muted)
+test('the limit ramp is green up to its first stop, yellow at its second, red from its third', async () => {
+  expect(rampColor(0, LIMIT_RAMP, DARK, DARK.green)).toBe(DARK.green)
+  expect(rampColor(60, LIMIT_RAMP, DARK, DARK.green)).toBe(DARK.green)
+  expect(rampColor(70, LIMIT_RAMP, DARK, DARK.green)).toBe(DARK.yellow)
+  expect(rampColor(85, LIMIT_RAMP, DARK, DARK.green)).toBe(DARK.red)
+  expect(rampColor(100, LIMIT_RAMP, DARK, DARK.green)).toBe(DARK.red)
+  // an unreadable % stays grey, whatever the low colour
+  expect(rampColor(NaN, LIMIT_RAMP, DARK, DARK.green)).toBe(DARK.muted)
+  // the context keeps grey as its low colour
   expect(rampColor(25, CONTEXT_RAMP, LIGHT)).toBe(LIGHT.muted)
   expect(rampColor(80, CONTEXT_RAMP, LIGHT)).toBe(LIGHT.red)
 })
 
 test('the ramp blends between its stops, by the % as shown (rounded)', async () => {
   expect(mix('#000000', '#ffffff', 0.5)).toBe('#808080')
-  // 62.5 shows as 63%: 13 of the 25 points from grey to yellow
-  expect(rampColor(62.5, LIMIT_RAMP, DARK)).toBe(mix(DARK.muted, DARK.yellow, 13 / 25))
-  // each step up moves further from grey
-  const reds = [51, 60, 70, 80, 90].map(p => parseInt(rampColor(p, LIMIT_RAMP, DARK).slice(1, 3), 16))
+  // 64.6 shows as 65%: halfway from green to yellow
+  expect(rampColor(64.6, LIMIT_RAMP, DARK, DARK.green)).toBe(mix(DARK.green, DARK.yellow, 0.5))
+  // each step up moves further toward red
+  const reds = [61, 65, 70, 78, 84].map(p => parseInt(rampColor(p, LIMIT_RAMP, DARK, DARK.green).slice(1, 3), 16))
   expect(reds).toEqual([...reds].sort((a, b) => a - b))
 })
 

@@ -50,8 +50,8 @@
     "limitColors": {
       "type": "string",
       "title": "Limit colours",
-      "description": "Three %s for the 5 Hour and Weekly bars: grey up to the first, yellow at the second, red at the third.",
-      "default": "50 75 95"
+      "description": "Three %s for the 5 Hour and Weekly bars: green up to the first, yellow at the second, red at the third.",
+      "default": "60 70 85"
     },
     "contextColors": {
       "type": "string",
