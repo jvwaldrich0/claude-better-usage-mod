@@ -168,15 +168,7 @@ function cellRuns(f: Forecast, cells: number, fill: string, c: Palette): { color
 // plain glyphs every font has (WGL4), drawn grey: ○ the 5 hour window, ● the weekly
 const windowIcon = (kind: string) => (kind === 'five_hour' ? '○' : kind === 'seven_day' ? '●' : '•')
 
-/**
- * The band in two parts: `top`, above the prompt, is the headline with Auto compact and
- * Compact beside it (and the auto compact question); `bottom`, under the prompt, is the
- * one row of limits; `rail`, the desktop widget in the session rail, is the limits
- * stacked, each with its bar and time to reset.
- */
-export type BandPart = 'top' | 'bottom' | 'rail'
-
-export function bandTree(table: ElementTable<'terminal' | 'desktop'>, surface: RenderSurface, width: number, view: BandView, act: BandActions, part: BandPart = 'top') {
+export function bandTree(table: ElementTable<'terminal' | 'desktop'>, surface: RenderSurface, width: number, view: BandView, act: BandActions) {
   const { snap, now, collapsed, auto, ask, tick, spent, drawnAt, t } = view
   const { Box, Text, Button, Input, Client } = table
   // thin Svg bars on the desktop alone: the terminal draws coloured cells
@@ -291,6 +283,12 @@ export function bandTree(table: ElementTable<'terminal' | 'desktop'>, surface: R
       <Box key="compactBox" marginLeft={isHeadBeside ? 2 : 0}>
         <Button key="compact" label={t.compact} hover={{ backgroundColor: c.compactLit }} onPress={() => act.compact()} />
       </Box>
+      <Button
+        key="collapse"
+        label={collapsed ? '▲' : '▼'}
+        plain
+        onPress={() => act.collapse()}
+      />
     </Box>
   )
   const gap = Svg ? 0.5 : 1
@@ -456,67 +454,39 @@ export function bandTree(table: ElementTable<'terminal' | 'desktop'>, surface: R
     </Box>
   )
 
-  // under the prompt: the limits on one row (each on its own row when narrow)
-  if (part === 'bottom') return collapsedBlock
-
-  // the session rail's widget: a narrow column, read at a glance (clicks may not reach it)
-  if (part === 'rail') {
-    if (limits.length === 0) return <Text color={c.muted} wrap="wrap">{t.noLimits}</Text>
-    return (
-      <Box flexDirection="column">
-        {limits.map((f, i) => {
-          const label = windowName(f.kind, t)
-          const pct = `${Math.round(f.percent)}%`
-          const left = f.status === 'idle' || !Number.isFinite(f.resetsAt) ? t.startsNext : fmt(t.resetsIn, { time: duration(f.resetsAt - now) })
-          return (
-            <Box key={f.kind} flexDirection="column" marginTop={i > 0 ? 1 : 0}>
-              <Box flexDirection="row" justifyContent="space-between">
-                <Box flexDirection="row" columnGap={1}>
-                  <Text color={c.muted}>{windowIcon(f.kind)}</Text>
-                  <Text bold>{label}</Text>
-                </Box>
-                <Text bold color={limitColor(f.percent)}>{pct}</Text>
-              </Box>
-              {bar(fmt(t.barUsed, { label, percent: Math.round(f.percent) }), limitSegments(f), Math.max(6, width), f)}
-              <Text color={c.muted} wrap="wrap">{left}</Text>
-            </Box>
-          )
-        })}
-      </Box>
-    )
-  }
-
   return (
     <Box flexDirection="column">
       {isHeadBeside ? (
-        <Box flexDirection="row" justifyContent="flex-start" alignItems="center" columnGap={3} paddingRight={HOST_HIDE}>
+        <Box flexDirection="row" justifyContent="flex-start" alignItems="center" columnGap={3} marginBottom={gap} paddingRight={HOST_HIDE}>
           <Box flexShrink={1}>{headText}</Box>
           {controls}
         </Box>
       ) : (
-        <Box flexDirection="column">
+        <Box flexDirection="column" marginBottom={gap}>
           <Box paddingRight={HOST_HIDE}>{headText}</Box>
           <Box marginTop={gap}>{controls}</Box>
         </Box>
       )}
 
-      {/* no reading yet, or the usage service failing: said under the headline */}
-      {limits.length === 0 ? <Text color={c.muted} wrap="wrap">{t.noLimits}</Text> : null}
-      {stale ? <Text color={c.yellow} wrap="wrap">{stale}</Text> : null}
-
       {ask ? (
         isAskLine ? (
-          <Box flexDirection="row" alignItems="center" columnGap={1} marginTop={gap}>
+          <Box flexDirection="row" alignItems="center" columnGap={1} marginBottom={gap}>
             <Box flexShrink={1}>{askText}</Box>
             {askButtons}
           </Box>
         ) : (
-          <Box flexDirection="column" marginTop={gap}>
+          <Box flexDirection="column" marginBottom={gap}>
             {askText}
             <Box marginTop={gap}>{askButtons}</Box>
           </Box>
         )
       ) : null}
+
+      {collapsed ? (
+        collapsedBlock
+      ) : (
+        limitsBlock
+      )}
     </Box>
   )
 }

@@ -17,10 +17,6 @@ import { settingsTree } from './settings-pane'
 let settings = readSettings()
 const HISTORY_PANE = 'usage-history'
 const SETTINGS_PANE = 'usage-settings'
-// the desktop's widget with the limits, for the session rail
-const RAIL_PANE = 'usage-rail'
-// whether the desktop seated the widget: then the band leaves the limits row to it
-let isRailPlaced = false
 // the band's words, in the language set or the one detected (applyLanguage)
 let t = stringsOf('en')
 // the desktop app's own language, from its settings (read beside its theme)
@@ -163,25 +159,6 @@ async function checkAlerts($: EngineInterface, limits: Limit[], now: number): Pr
 }
 
 // a pane opened by the person's command, and the line the command answers with
-// the limits as a widget: the desktop's small pane form, which can sit in the session rail
-async function openRail($: EngineInterface): Promise<void> {
-  try {
-    const opened = await $.ui.open({ id: RAIL_PANE, title: `${t.fiveHour} · ${t.weekly}`, placement: 'widget' })
-    isRailPlaced = opened.isPlaced
-  } catch {
-    isRailPlaced = false
-  }
-}
-
-// whether the widget is still up: closed, the band brings the limits row back
-async function isRailUp($: EngineInterface): Promise<boolean> {
-  try {
-    return (await $.ui.panes()).some(pane => pane.id === RAIL_PANE && pane.isPlaced)
-  } catch {
-    return false
-  }
-}
-
 async function openPane($: EngineInterface, id: string, title: string): Promise<string> {
   const opened = await $.ui.open({ id, title })
   return fmt(opened.isPlaced ? t.paneOpened : t.paneWaits, { title })
@@ -648,27 +625,6 @@ function bandActions($: EngineInterface): BandActions {
   }
 }
 
-// the band's view, shared by its two parts (above and under the prompt)
-async function bandView($: EngineInterface, snap: Snapshot) {
-  const auto = await read($, autoCompact)
-  return {
-    snap,
-    now: await $.clock.now(),
-    isLight: (await read($, theme)) === 'light',
-    collapsed: await read($, isCollapsed),
-    auto,
-    ask: await read($, autoAsk),
-    tick: await read($, fieldTick),
-    spent: await read($, spend),
-    drawnAt: (await read($, fieldText)) ?? `${auto.at ?? settings.autoCompactAt}`,
-    limitRamp: settings.limitRamp,
-    contextRamp: settings.contextRamp,
-    chatCost: settings.chatCost,
-    t: stringsOf(await read($, language)),
-    isHitDown,
-  }
-}
-
 export const register: Register = (on, options) => {
   settings = readSettings(options)
 
@@ -695,8 +651,6 @@ export const register: Register = (on, options) => {
     await syncCollapsed($)
     // a chat just opened: its limits now, unless another chat asked a moment ago
     await refresh($, 'due')
-    // on the desktop the limits also live in a widget, for the session rail
-    if (e.surface === 'desktop') await openRail($)
     // the exact count on a timer, never from the hook itself: work a hook starts and
     // leaves running ends with its dispatch, which is why it never ran before
     $.clock.after(2_000, () => void calibrate($))
@@ -808,13 +762,6 @@ export const register: Register = (on, options) => {
     }, key => void update($, openRows, rows => (rows.includes(key) ? rows.filter(r => r !== key) : [...rows, key])))
   })
 
-  on('ui.render', { component: 'Pane', requestId: RAIL_PANE }, async ($, e, next) => {
-    if (e.surface !== 'terminal' && e.surface !== 'desktop') return next(e)
-    const snap = await read($, snapshot)
-    if (!snap) return next(e)
-    return bandTree($.ui.resolve(e), e.surface, Math.max(12, e.props.bodyColumns), await bandView($, snap), bandActions($), 'rail')
-  })
-
   on('ui.render', { component: 'Pane', requestId: SETTINGS_PANE }, async ($, e, next) => {
     // its pickers and fields are the terminal's and the desktop's
     if (e.surface !== 'terminal' && e.surface !== 'desktop') return next(e)
@@ -825,49 +772,28 @@ export const register: Register = (on, options) => {
     }, (field, value) => void setSetting($, field, value))
   })
 
-  // the prompt's width as the band last saw it: the line under the prompt is told none
-  let promptColumns = 80
-
-  // above the prompt: the headline, with Auto compact and Compact beside it
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     // the band is raised on these two alone; the check narrows the elements' table
     if (e.surface !== 'terminal' && e.surface !== 'desktop') return next(e)
     if (e.props.hasSurvey || !(await read($, isOn))) return next(e)
     const snap = await read($, snapshot)
     if (!snap) return next(e)
-    promptColumns = Math.max(20, e.props.bodyColumns)
-    const table = $.ui.resolve(e)
-    const view = await bandView($, snap)
-    const top = bandTree(table, e.surface, promptColumns, view, bandActions($), 'top')
-    // the desktop app draws its own prompt box and never asks for the line under it:
-    // there the limits row sits in the band, right under the headline
-    if (e.surface !== 'desktop' || snap.limits.length === 0) return top
-    // the widget shows them: the band keeps to the headline (a closed widget brings the row back)
-    if (isRailPlaced && (await isRailUp($))) return top
-    const { Box } = table
-    return (
-      <Box flexDirection="column" rowGap={0.5}>
-        {top}
-        {bandTree(table, e.surface, promptColumns, view, bandActions($), 'bottom')}
-      </Box>
-    )
-  })
-
-  // under the prompt, in the terminal: the row of limits, then the app's own hint line
-  on('ui.render', { component: 'PromptHint' }, async ($, e, next) => {
-    // the terminal alone: the desktop draws the row in the band (above)
-    if (e.surface !== 'terminal') return next(e)
-    if (!(await read($, isOn))) return next(e)
-    const snap = await read($, snapshot)
-    if (!snap || snap.limits.length === 0) return next(e)
-    const hint = await next(e)
-    const table = $.ui.resolve(e)
-    const { Box } = table
-    return (
-      <Box flexDirection="column">
-        {bandTree(table, e.surface, promptColumns, await bandView($, snap), bandActions($), 'bottom')}
-        {hint}
-      </Box>
-    )
+    const auto = await read($, autoCompact)
+    return bandTree($.ui.resolve(e), e.surface, Math.max(20, e.props.bodyColumns), {
+      snap,
+      now: await $.clock.now(),
+      isLight: (await read($, theme)) === 'light',
+      collapsed: await read($, isCollapsed),
+      auto,
+      ask: await read($, autoAsk),
+      tick: await read($, fieldTick),
+      spent: await read($, spend),
+      drawnAt: (await read($, fieldText)) ?? `${auto.at ?? settings.autoCompactAt}`,
+      limitRamp: settings.limitRamp,
+      contextRamp: settings.contextRamp,
+      chatCost: settings.chatCost,
+      t: stringsOf(await read($, language)),
+      isHitDown,
+    }, bandActions($))
   })
 }
