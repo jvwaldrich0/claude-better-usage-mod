@@ -125,7 +125,8 @@ test('draws the band on track', async ($, on) => {
       // thin Svg bars: the two rate bars, each with a forecast tick, no flexGrow segments
       // (the auto compact switch is an Svg too: left out here)
       const svgs = (await ui.findAll({ type: 'Svg' })).filter(svg => !/^Auto compact/.test(String(svg.props.alt)))
-      expect(svgs).toHaveLength(2)
+      // the band's row, and the rail widget's when it is drawn: 5 Hour then Weekly first
+      expect(svgs.length).toBeGreaterThanOrEqual(2)
       expect(svgs[0]?.props.alt).toMatch(/^5 Hour/)
       expect(svgs[1]?.props.alt).toMatch(/^Weekly/)
       expect(svgs[0]?.props.height).toBe(7.5)

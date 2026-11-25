@@ -17,6 +17,10 @@ import { settingsTree } from './settings-pane'
 let settings = readSettings()
 const HISTORY_PANE = 'usage-history'
 const SETTINGS_PANE = 'usage-settings'
+// the desktop's widget with the limits, for the session rail
+const RAIL_PANE = 'usage-rail'
+// whether the desktop seated the widget: then the band leaves the limits row to it
+let isRailPlaced = false
 // the band's words, in the language set or the one detected (applyLanguage)
 let t = stringsOf('en')
 // the desktop app's own language, from its settings (read beside its theme)
@@ -159,6 +163,25 @@ async function checkAlerts($: EngineInterface, limits: Limit[], now: number): Pr
 }
 
 // a pane opened by the person's command, and the line the command answers with
+// the limits as a widget: the desktop's small pane form, which can sit in the session rail
+async function openRail($: EngineInterface): Promise<void> {
+  try {
+    const opened = await $.ui.open({ id: RAIL_PANE, title: `${t.fiveHour} · ${t.weekly}`, placement: 'widget' })
+    isRailPlaced = opened.isPlaced
+  } catch {
+    isRailPlaced = false
+  }
+}
+
+// whether the widget is still up: closed, the band brings the limits row back
+async function isRailUp($: EngineInterface): Promise<boolean> {
+  try {
+    return (await $.ui.panes()).some(pane => pane.id === RAIL_PANE && pane.isPlaced)
+  } catch {
+    return false
+  }
+}
+
 async function openPane($: EngineInterface, id: string, title: string): Promise<string> {
   const opened = await $.ui.open({ id, title })
   return fmt(opened.isPlaced ? t.paneOpened : t.paneWaits, { title })
@@ -672,6 +695,8 @@ export const register: Register = (on, options) => {
     await syncCollapsed($)
     // a chat just opened: its limits now, unless another chat asked a moment ago
     await refresh($, 'due')
+    // on the desktop the limits also live in a widget, for the session rail
+    if (e.surface === 'desktop') await openRail($)
     // the exact count on a timer, never from the hook itself: work a hook starts and
     // leaves running ends with its dispatch, which is why it never ran before
     $.clock.after(2_000, () => void calibrate($))
@@ -783,6 +808,13 @@ export const register: Register = (on, options) => {
     }, key => void update($, openRows, rows => (rows.includes(key) ? rows.filter(r => r !== key) : [...rows, key])))
   })
 
+  on('ui.render', { component: 'Pane', requestId: RAIL_PANE }, async ($, e, next) => {
+    if (e.surface !== 'terminal' && e.surface !== 'desktop') return next(e)
+    const snap = await read($, snapshot)
+    if (!snap) return next(e)
+    return bandTree($.ui.resolve(e), e.surface, Math.max(12, e.props.bodyColumns), await bandView($, snap), bandActions($), 'rail')
+  })
+
   on('ui.render', { component: 'Pane', requestId: SETTINGS_PANE }, async ($, e, next) => {
     // its pickers and fields are the terminal's and the desktop's
     if (e.surface !== 'terminal' && e.surface !== 'desktop') return next(e)
@@ -810,6 +842,8 @@ export const register: Register = (on, options) => {
     // the desktop app draws its own prompt box and never asks for the line under it:
     // there the limits row sits in the band, right under the headline
     if (e.surface !== 'desktop' || snap.limits.length === 0) return top
+    // the widget shows them: the band keeps to the headline (a closed widget brings the row back)
+    if (isRailPlaced && (await isRailUp($))) return top
     const { Box } = table
     return (
       <Box flexDirection="column" rowGap={0.5}>

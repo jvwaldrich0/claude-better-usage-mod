@@ -171,9 +171,10 @@ const windowIcon = (kind: string) => (kind === 'five_hour' ? '○' : kind === 's
 /**
  * The band in two parts: `top`, above the prompt, is the headline with Auto compact and
  * Compact beside it (and the auto compact question); `bottom`, under the prompt, is the
- * one row of limits.
+ * one row of limits; `rail`, the desktop widget in the session rail, is the limits
+ * stacked, each with its bar and time to reset.
  */
-export type BandPart = 'top' | 'bottom'
+export type BandPart = 'top' | 'bottom' | 'rail'
 
 export function bandTree(table: ElementTable<'terminal' | 'desktop'>, surface: RenderSurface, width: number, view: BandView, act: BandActions, part: BandPart = 'top') {
   const { snap, now, collapsed, auto, ask, tick, spent, drawnAt, t } = view
@@ -457,6 +458,33 @@ export function bandTree(table: ElementTable<'terminal' | 'desktop'>, surface: R
 
   // under the prompt: the limits on one row (each on its own row when narrow)
   if (part === 'bottom') return collapsedBlock
+
+  // the session rail's widget: a narrow column, read at a glance (clicks may not reach it)
+  if (part === 'rail') {
+    if (limits.length === 0) return <Text color={c.muted} wrap="wrap">{t.noLimits}</Text>
+    return (
+      <Box flexDirection="column">
+        {limits.map((f, i) => {
+          const label = windowName(f.kind, t)
+          const pct = `${Math.round(f.percent)}%`
+          const left = f.status === 'idle' || !Number.isFinite(f.resetsAt) ? t.startsNext : fmt(t.resetsIn, { time: duration(f.resetsAt - now) })
+          return (
+            <Box key={f.kind} flexDirection="column" marginTop={i > 0 ? 1 : 0}>
+              <Box flexDirection="row" justifyContent="space-between">
+                <Box flexDirection="row" columnGap={1}>
+                  <Text color={c.muted}>{windowIcon(f.kind)}</Text>
+                  <Text bold>{label}</Text>
+                </Box>
+                <Text bold color={limitColor(f.percent)}>{pct}</Text>
+              </Box>
+              {bar(fmt(t.barUsed, { label, percent: Math.round(f.percent) }), limitSegments(f), Math.max(6, width), f)}
+              <Text color={c.muted} wrap="wrap">{left}</Text>
+            </Box>
+          )
+        })}
+      </Box>
+    )
+  }
 
   return (
     <Box flexDirection="column">

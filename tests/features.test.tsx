@@ -235,7 +235,8 @@ test('typing /quota lists all three commands: the band, its history and its sett
   await $.command.run({ command: 'quota-settings', args: '' } as never)
   await $.command.run({ command: 'quota-history', args: '' } as never)
   await $.command.run({ command: 'quota', args: 'settings' } as never)
-  expect(said.opened).toEqual(['usage-settings', 'usage-history', 'usage-settings'])
+  // the desktop opens the limits' widget for the session rail first
+  expect(said.opened).toEqual(['usage-rail', 'usage-settings', 'usage-history', 'usage-settings'])
 })
 
 test('the band speaks the language set: Turkish words, Turkish times', { options: { language: 'tr' } }, async ($, on) => {
@@ -250,8 +251,9 @@ test('the band speaks the language set: Turkish words, Turkish times', { options
     const ui = await mountBand($, { plugin: 'usage-quota', surface, component: 'AbovePrompt', props: PROPS })
     // NOW is a Sunday: Weekly, on course to run out, resets on Friday ("Cuma")
     expect(await ui.find({ type: 'Text', text: 'Bu hızla Cuma günkü sıfırlamadan önce limitin dolacak.' })).toBeDefined()
-    expect(await ui.find({ type: 'Text', text: '5S' })).toBeDefined()
-    expect(await ui.find({ type: 'Text', text: 'H' })).toBeDefined()
+    // short names under the prompt (terminal), whole ones in the rail's widget (desktop)
+    expect((await ui.find({ type: 'Text', text: '5S' })) ?? (await ui.find({ type: 'Text', text: '5 Saat' }))).toBeDefined()
+    expect((await ui.find({ type: 'Text', text: 'H' })) ?? (await ui.find({ type: 'Text', text: 'Haftalık' }))).toBeDefined()
     expect(await ui.find({ type: 'Button', label: 'Sıkıştır' } as never)).toBeDefined()
     await ui.unmount()
   }
@@ -265,7 +267,7 @@ test("set to auto, the band follows the desktop app's language", async ($, on) =
   on('fs.read', () => ({ value: JSON.stringify({ userThemeMode: 'dark', locale: 'de-DE' }) }) as never)
   await $.session.start({ cwd: '.', surface: 'desktop', isInteractive: true })
   const ui = await mountBand($, { plugin: 'usage-quota', surface: 'desktop', component: 'AbovePrompt', props: PROPS })
-  expect(await ui.find({ type: 'Text', text: 'W' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: 'Wöchentlich' })).toBeDefined()
   await ui.unmount()
 })
 
