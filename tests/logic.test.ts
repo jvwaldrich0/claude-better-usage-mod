@@ -30,9 +30,12 @@ test('the ramp blends between its stops, by the % as shown (rounded)', async () 
   expect(mix('#000000', '#ffffff', 0.5)).toBe('#808080')
   // 64.6 shows as 65%: halfway from green to yellow
   expect(rampColor(64.6, LIMIT_RAMP, DARK, DARK.green)).toBe(mix(DARK.green, DARK.yellow, 0.5))
-  // each step up moves further toward red
-  const reds = [61, 65, 70, 78, 84].map(p => parseInt(rampColor(p, LIMIT_RAMP, DARK, DARK.green).slice(1, 3), 16))
+  // each step up moves further from green: red rises toward yellow, then green falls toward red
+  const channel = (p: number, at: number) => parseInt(rampColor(p, LIMIT_RAMP, DARK, DARK.green).slice(at, at + 2), 16)
+  const reds = [61, 65, 70].map(p => channel(p, 1))
   expect(reds).toEqual([...reds].sort((a, b) => a - b))
+  const greens = [70, 78, 84].map(p => channel(p, 3))
+  expect(greens).toEqual([...greens].sort((a, b) => b - a))
 })
 
 test('a burst in the first 15% of a window does not forecast a run-out', async () => {

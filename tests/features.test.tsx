@@ -328,7 +328,7 @@ test('the settings move the colours and can hide what the chat used', { options:
   const ui = await $.ui.mount({ plugin: 'usage-quota', surface: 'desktop', component: 'AbovePrompt', props: PROPS })
   // red at 30% by these settings, not grey
   expect((await ui.find({ type: 'Text', text: '30%' }))?.props.color).not.toBe(GREY)
-  expect((await ui.find({ type: 'Text', text: '30%' }))?.props.color).toBe('#e5534b')
+  expect((await ui.find({ type: 'Text', text: '30%' }))?.props.color).toBe('#d47a6f')
   expect(await ui.find({ text: /^This chat used/ })).toBeUndefined()
   await ui.unmount()
 })

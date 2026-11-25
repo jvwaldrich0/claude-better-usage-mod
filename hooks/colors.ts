@@ -1,4 +1,5 @@
 // Two palettes, the desktop's dark and light themes, in Claude's own neutral greys.
+// Soft, desaturated tones that sit with Claude's greys rather than shout.
 // Limits are green while usage is low, then turn smoothly to yellow and on to red;
 // the context stays grey until it matters.
 export type Palette = {
@@ -12,7 +13,7 @@ export type Palette = {
 }
 
 export const DARK: Palette = {
-  muted: '#9b9a96', green: '#4ade80', yellow: '#e5b54a', red: '#e5534b',
+  muted: '#9b9a96', green: '#8fb08a', yellow: '#d6b36e', red: '#d47a6f',
   free: '#333332', buffer: '#4d4d4a', track: '#333332', tick: '#dcdbd6',
   palette: ['#a78bfa', '#60a5fa', '#f472b6', '#34d399', '#fbbf24', '#fb923c', '#22d3ee', '#c084fc'],
   named: {
@@ -25,7 +26,7 @@ export const DARK: Palette = {
 
 // light: the same hues, deep enough to read as text on the pale band; the tracks pale
 export const LIGHT: Palette = {
-  muted: '#73726c', green: '#16a34a', yellow: '#c98a04', red: '#dc3c34',
+  muted: '#73726c', green: '#5a8a5f', yellow: '#a9822c', red: '#b85a4f',
   free: '#ffffff', buffer: '#c4c3be', track: '#ffffff', tick: '#3d3c38',
   palette: ['#8b5cf6', '#3b82f6', '#ec4899', '#10b981', '#f59e0b', '#f97316', '#0ea5e9', '#a855f7'],
   named: {

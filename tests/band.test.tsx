@@ -10,9 +10,9 @@ const PILL = { type: 'down', x: 1, y: 0, button: 'left' } as const
 
 // the dark palette's grey, yellow and red (hooks/colors.ts)
 const GREY = '#9b9a96'
-const GREEN = '#4ade80'
-const YELLOW = '#e5b54a'
-const RED = '#e5534b'
+const GREEN = '#8fb08a'
+const YELLOW = '#d6b36e'
+const RED = '#d47a6f'
 
 const PROPS = {
   hasSurvey: false,
@@ -875,9 +875,9 @@ test('the desktop in light mode draws in the light palette', async ($, on) => {
   await clock.advance(2_000)
   const ui = await $.ui.mount({ plugin: 'usage-quota', surface: 'desktop', component: 'AbovePrompt', props: PROPS })
   // the light theme's green, deep enough to read on the pale band
-  expect((await ui.find({ type: 'Text', text: /^On track\./ }))?.props.color).toBe('#16a34a')
+  expect((await ui.find({ type: 'Text', text: /^On track\./ }))?.props.color).toBe('#5a8a5f')
   const weeklyBar = (await ui.findAll({ type: 'Svg' })).find(svg => /^Weekly/.test(String(svg.props.alt)))
-  expect(String(weeklyBar?.props.source)).toContain('fill="#16a34a"')
+  expect(String(weeklyBar?.props.source)).toContain('fill="#5a8a5f"')
   const before = reads
   await clock.advance(10_000)
   expect(reads).toBe(before)
@@ -1160,7 +1160,7 @@ test('a limit bar and its % stay green to 60% used, turn yellow by 70% and red b
   on('session.usage', () => ({ value: usage([{ kind: 'seven_day', percentUsed: state.percent, resetsAt: iso(2 * HOUR) }]) }))
   answerRest(on, [])
   // between the stops the colour blends: 60% is 40% of the way to yellow, 85% halfway to red
-  for (const [percent, color] of [[60, GREEN], [65, '#98ca65'], [70, YELLOW], [78, '#e5814b'], [85, RED]] as const) {
+  for (const [percent, color] of [[60, GREEN], [65, '#b3b27c'], [70, YELLOW], [78, '#d5956f'], [85, RED]] as const) {
     state.percent = percent
     await clock.advance(1_000)
     await $.session.measure(MEASURE)
@@ -1180,7 +1180,7 @@ test('Context stays grey to 25%, turns yellow by 50% and red by 80%', async ($, 
     return { value: { ...u, context: { ...u.context, percent: state.percent } } }
   })
   answerRest(on, [])
-  for (const [percent, color] of [[25, GREY], [35, '#b9a578'], [50, YELLOW], [65, '#e5844b'], [80, RED]] as const) {
+  for (const [percent, color] of [[25, GREY], [35, '#b3a486'], [50, YELLOW], [65, '#d5976f'], [80, RED]] as const) {
     state.percent = percent
     await clock.advance(1_000)
     await $.session.measure(MEASURE)
