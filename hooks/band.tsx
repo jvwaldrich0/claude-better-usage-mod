@@ -210,17 +210,14 @@ export function bandTree(table: ElementTable<'terminal' | 'desktop'>, surface: R
   // corner: the first row keeps clear of it
   const HOST_HIDE = Svg ? 0 : 4
   const isHeadBeside = width >= cellsOf(head?.text ?? '') * (Svg ? 0.8 : 1) + CONTROLS + HOST_HIDE
-  // the windows and the context side by side, or one above the other
-  const isSplit = width >= 84
-  const column = isSplit ? Math.floor((width - 4) / 2) : width
+  // the limits take the band's whole width: no context column beside them
+  const column = width
   // the limit bars fill their column: less the label (as wide as the longest name, 8 at
   // least) and the % (2 + 4)
   const labelCells = Math.max(8, ...Object.keys(WINDOWS).map(kind => cellsOf(windowName(kind, t)) + 3))
   const cells = Math.max(6, column - labelCells - 6)
   // collapsed: the three bars in one row, or each on a row of its own
   const isOneRow = width >= 72
-  // the context's two figures on one line, or the free count on the next
-  const isContextLine = column >= 38
   // the question and its two answers on one line when they fit, else the answers
   // beneath: measured from the words themselves (the desktop draws text narrower than
   // a cell each, as the headline's check allows), each button's chrome and the gaps
@@ -348,7 +345,7 @@ export function bandTree(table: ElementTable<'terminal' | 'desktop'>, surface: R
   const spendNote = !view.chatCost || spent.last === null ? null : fmt(t.chatUsed, { total: share(spent.total), last: share(spent.last) })
 
   const limitsBlock = (
-    <Box flexDirection="column" width={isSplit ? '50%' : undefined}>
+    <Box flexDirection="column">
       {limits.length === 0 ? <Text color={c.muted} wrap="wrap">{t.noLimits}</Text> : null}
       {stale ? <Text color={c.yellow} wrap="wrap">{stale}</Text> : null}
       {limits.map((f, i) => {
@@ -387,41 +384,6 @@ export function bandTree(table: ElementTable<'terminal' | 'desktop'>, surface: R
     </Box>
   )
 
-  const contextColor = rampColor(snap.percent, view.contextRamp, c)
-  const usedText = <Text bold color={contextColor}>{fmt(t.used, { percent: Math.round(snap.percent) })}</Text>
-  const freeText = <Text color={c.muted}>{fmt(t.free, { free: tokens(free), window: tokens(snap.window) })}</Text>
-  const contextName = (
-    <Box flexDirection="row">
-      <Text bold>{t.context}</Text>
-      <Box marginLeft={2}>{usedText}</Box>
-    </Box>
-  )
-  const contextBlock = (
-    <Box flexDirection="column" width={isSplit ? '50%' : undefined}>
-      {bar(fmt(t.barUsed, { label: t.context, percent: Math.round(snap.percent) }), contextSegments, column)}
-      {isContextLine ? (
-        <Box flexDirection="row" justifyContent="space-between" columnGap={2}>
-          {contextName}
-          {freeText}
-        </Box>
-      ) : (
-        <Box flexDirection="column">
-          {contextName}
-          {freeText}
-        </Box>
-      )}
-      {(['Messages', 'Tools', 'Other'] as const)
-        .map(name => shown.find(cat => cat.name === name))
-        .filter((cat): cat is (typeof shown)[number] => cat !== undefined)
-        .map(cat => (
-          <Box flexDirection="row" justifyContent="space-between">
-            <Text color={cat.color}>{groupName(cat.name, t)}</Text>
-            <Text color={c.muted}>{tokens(cat.tokens)}</Text>
-          </Box>
-        ))}
-    </Box>
-  )
-
   // collapsed, the limits go by a short name and the time to their reset: "5H 1h 3m",
   // "W 2d 21h"; a window not running shows its whole length: "5H 5h", "W 7d"
   const compactItems = [
@@ -433,8 +395,6 @@ export function bandTree(table: ElementTable<'terminal' | 'desktop'>, surface: R
       percent: f.percent,
       color: limitColor(f.percent), segments: limitSegments(f), f: f as Forecast | undefined,
     })),
-    // Context with the whole window, as the limits have their time: 1M, 200k
-    { label: t.context, short: t.context, until: tokens(snap.window), percent: snap.percent, color: contextColor, segments: contextSegments, f: undefined as Forecast | undefined },
   ]
   const nameOf = (item: (typeof compactItems)[number]) => (
     <Box flexDirection="row" columnGap={1} flexShrink={0}>
@@ -443,45 +403,25 @@ export function bandTree(table: ElementTable<'terminal' | 'desktop'>, surface: R
     </Box>
   )
   const nameLength = (item: (typeof compactItems)[number]) => cellsOf(item.short) + (item.until ? item.until.length + 1 : 0)
-  const third = Math.floor((width - 2 * 3) / 3)
-  // Collapsed, one row: each limit sits in a slot of fixed width, so W always starts at
-  // the same place: its name, room for the longest time ("4h 59m", "6d 23h"), its bar
-  // (one fixed width for both), room for "100%". A shorter time moves the bar left
-  // inside the slot, never the slot. Context takes all that is left, its % held to
-  // the right edge, its bar as wide as fits.
-  const TIME_CELLS = 6
-  const limitBar = Math.max(6, third - 'Weekly'.length - '100%'.length - 2)
-  const slotOf = (item: (typeof compactItems)[number]) => cellsOf(item.short) + 1 + TIME_CELLS + 1 + limitBar + 1 + '100%'.length
-  // between the slots: enough that a 100% never runs into the next name
+  // Collapsed, one row: the limits share the band's width, each in an equal slot:
+  // its name, room for the longest time ("4h 59m", "6d 23h"), its bar, room for "100%"
   const GAP = 2
-  const slotsWidth = compactItems.filter(item => item.f).reduce((sum, item) => sum + slotOf(item) + GAP, 0)
-  const contextItem = compactItems[compactItems.length - 1]!
-  const contextBar = Math.max(6, width - slotsWidth - nameLength(contextItem) - 1 - 1 - `${Math.round(contextItem.percent)}%`.length)
+  const TIME_CELLS = 6
+  const slot = Math.floor((width - GAP * Math.max(0, compactItems.length - 1)) / Math.max(1, compactItems.length))
+  const limitBar = Math.max(6, slot - 'Weekly'.length - 1 - TIME_CELLS - 1 - 1 - '100%'.length)
   const collapsedBlock = isOneRow ? (
     <Box flexDirection="row" columnGap={GAP}>
-      {compactItems.map(item => {
-        const pct = `${Math.round(item.percent)}%`
-        const isContext = item === contextItem
-        return (
-          <Box flexDirection="row" width={isContext ? undefined : slotOf(item)} flexGrow={isContext ? 1 : 0} flexShrink={isContext ? 1 : 0}>
-            <Box marginRight={1} flexShrink={0}>
-              {nameOf(item)}
-            </Box>
-            {isContext && Svg ? (
-              // on the desktop the bar stretches to fill what the row leaves, so the
-              // % lands at the right edge however wide the text draws
-              <Box flexGrow={1} flexShrink={1} height={1} alignItems="center">
-                <Svg alt={fmt(t.barUsed, { label: item.label, percent: Math.round(item.percent) })} source={barSvg(item.segments, 4000)} height={BAR_PX} />
-              </Box>
-            ) : (
-              bar(fmt(t.barUsed, { label: item.label, percent: Math.round(item.percent) }), item.segments, isContext ? contextBar : limitBar, item.f)
-            )}
-            <Box marginLeft={1} flexShrink={0} flexGrow={isContext && !Svg ? 1 : 0} justifyContent={isContext ? 'flex-end' : undefined}>
-              <Text bold color={item.color}>{pct}</Text>
-            </Box>
+      {compactItems.map(item => (
+        <Box flexDirection="row" flexGrow={1} flexShrink={1}>
+          <Box marginRight={1} flexShrink={0}>
+            {nameOf(item)}
           </Box>
-        )
-      })}
+          {bar(fmt(t.barUsed, { label: item.label, percent: Math.round(item.percent) }), item.segments, limitBar, item.f)}
+          <Box marginLeft={1} flexShrink={0}>
+            <Text bold color={item.color}>{`${Math.round(item.percent)}%`}</Text>
+          </Box>
+        </Box>
+      ))}
     </Box>
   ) : (
     // each on a row of its own, the names in one column (as wide as the longest) and
@@ -517,7 +457,7 @@ export function bandTree(table: ElementTable<'terminal' | 'desktop'>, surface: R
   return (
     <Box flexDirection="column">
       {isHeadBeside ? (
-        <Box flexDirection="row" justifyContent="space-between" alignItems="center" marginBottom={gap} paddingRight={HOST_HIDE}>
+        <Box flexDirection="row" justifyContent="flex-start" alignItems="center" columnGap={3} marginBottom={gap} paddingRight={HOST_HIDE}>
           <Box flexShrink={1}>{headText}</Box>
           {controls}
         </Box>
@@ -544,17 +484,8 @@ export function bandTree(table: ElementTable<'terminal' | 'desktop'>, surface: R
 
       {collapsed ? (
         collapsedBlock
-      ) : isSplit ? (
-        <Box flexDirection="row" columnGap={4}>
-          {limitsBlock}
-          {contextBlock}
-        </Box>
       ) : (
-        <Box flexDirection="column">
-          {limitsBlock}
-          <Text> </Text>
-          {contextBlock}
-        </Box>
+        limitsBlock
       )}
     </Box>
   )

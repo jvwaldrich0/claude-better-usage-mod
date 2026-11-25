@@ -251,7 +251,6 @@ test('the band speaks the language set: Turkish words, Turkish times', { options
     expect(await ui.find({ type: 'Text', text: 'Bu hızla Cuma günkü sıfırlamadan önce limitin dolacak.' })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: '5 Saat' })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: 'Haftalık' })).toBeDefined()
-    expect(await ui.find({ type: 'Text', text: 'Bağlam' })).toBeDefined()
     expect(await ui.find({ type: 'Button', label: 'Sıkıştır' } as never)).toBeDefined()
     await ui.unmount()
   }
@@ -266,7 +265,6 @@ test("set to auto, the band follows the desktop app's language", async ($, on) =
   await $.session.start({ cwd: '.', surface: 'desktop', isInteractive: true })
   const ui = await $.ui.mount({ plugin: 'usage-quota', surface: 'desktop', component: 'AbovePrompt', props: PROPS })
   expect(await ui.find({ type: 'Text', text: 'Wöchentlich' })).toBeDefined()
-  expect(await ui.find({ type: 'Text', text: 'Kontext' })).toBeDefined()
   await ui.unmount()
 })
 

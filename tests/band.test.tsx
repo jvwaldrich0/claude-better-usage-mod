@@ -103,29 +103,15 @@ test('draws the band on track', async ($, on) => {
   for (const surface of SURFACES) {
     const ui = await $.ui.mount({ plugin: 'usage-quota', surface, component: 'AbovePrompt', props: PROPS })
     expect(await ui.find({ text: /^On track\. You should reach Wednesday's reset with room to spare\.$/ })).toBeDefined()
-    expect(await ui.find({ text: '16% used' })).toBeDefined()
-    expect(await ui.find({ text: '809k free of 1M' })).toBeDefined()
-    expect(await ui.find({ text: 'Messages' })).toBeDefined()
-    expect(await ui.find({ text: '96k' })).toBeDefined()
-    // three groups: Messages, Tools (34k + 17k), Other (4k + 6k + 1k), Other in grey
-    expect(await ui.find({ type: 'Text', text: 'Tools' })).toBeDefined()
-    expect(await ui.find({ type: 'Text', text: '51k' })).toBeDefined()
-    expect((await ui.find({ type: 'Text', text: 'Other' }))?.props.color).toBe(GREY)
-    expect(await ui.find({ type: 'Text', text: '11k' })).toBeDefined()
-    expect(await ui.find({ text: 'Memory files' })).toBeUndefined()
-    // only the top three categories are listed
-    expect(await ui.find({ text: 'Skills' })).toBeUndefined()
-    expect(await ui.find({ text: 'System prompt' })).toBeUndefined()
-    expect(await ui.find({ text: 'Deferred tools' })).toBeUndefined()
+    // the limits take the whole band: no context bar, figures or categories
+    expect(await ui.find({ text: '16% used' })).toBeUndefined()
+    expect(await ui.find({ text: 'Context' })).toBeUndefined()
+    expect(await ui.find({ text: 'Messages' })).toBeUndefined()
     expect(await ui.find({ text: '5 Hour' })).toBeDefined()
     expect(await ui.find({ text: 'Weekly' })).toBeDefined()
     expect(await ui.find({ text: 'On pace for about 80% by reset – resets in 3d 7h' })).toBeDefined()
     expect(await ui.find({ text: 'On pace for about 35% by reset – resets in 3h 24m' })).toBeDefined()
     expect(await ui.find({ text: /·/ })).toBeUndefined()
-    // legend runs highest first
-    const names = (await ui.findAll({ type: 'Text' })).map(t => t.text)
-    const order = ['Messages', 'Tools', 'Other'].map(n => names.indexOf(n))
-    expect(order).toEqual([...order].sort((a, b) => a - b))
 
     // every flexGrow is finite, within the engine's limit, and never a raw token count
     const boxes = await ui.findAll({ type: 'Box' })
@@ -137,15 +123,13 @@ test('draws the band on track', async ($, on) => {
       expect(grow as number).toBeGreaterThanOrEqual(1)
     }
     if (surface === 'desktop') {
-      // thin Svg bars: the context bar and the two rate bars, no flexGrow segments
+      // thin Svg bars: the two rate bars, each with a forecast tick, no flexGrow segments
       // (the auto compact switch is an Svg too: left out here)
       const svgs = (await ui.findAll({ type: 'Svg' })).filter(svg => !/^Auto compact/.test(String(svg.props.alt)))
-      // the two rate bars (left, each with a forecast tick), then the context bar (right)
-      expect(svgs).toHaveLength(3)
+      expect(svgs).toHaveLength(2)
       expect(svgs[0]?.props.alt).toMatch(/^5 Hour/)
       expect(svgs[1]?.props.alt).toMatch(/^Weekly/)
-      expect(svgs[2]?.props.alt).toMatch(/^Context/)
-      expect(svgs[2]?.props.height).toBe(7.5)
+      expect(svgs[0]?.props.height).toBe(7.5)
       expect(String(svgs[0]?.props.source)).toContain(`fill="${GREEN}"`)
       expect(String(svgs[1]?.props.source)).toContain(`fill="${GREEN}"`)
       expect(boxes.filter(b => typeof b.props.flexGrow === 'number')).toHaveLength(0)
@@ -153,8 +137,8 @@ test('draws the band on track', async ($, on) => {
       // 5 hour at 8% (1 cell, green: low usage) with its tick near 32% (cell 5), on the terminal
       const cells = boxes.filter(b => b.props.backgroundColor === GREEN || b.props.backgroundColor === '#dcdbd6')
       expect(cells.length).toBeGreaterThanOrEqual(2)
-      // 4 bar segments: Messages, Tools, Other with the buffer as one grey run, free
-      expect(boxes.filter(b => typeof b.props.flexGrow === 'number')).toHaveLength(4)
+      // the limit bars are cells of fixed width: no flexGrow segments
+      expect(boxes.filter(b => typeof b.props.flexGrow === 'number')).toHaveLength(0)
     }
     await ui.unmount()
   }
@@ -316,34 +300,6 @@ test('the plan endpoint gives the limits before any reply, and wins', async ($, 
   }
 })
 
-test('the exact /context count corrects the estimate, and Messages with it', async ($, on) => {
-  const clock = mock.clock(on, { now: NOW })
-  mock.store(on)
-  // the exact count: System tools 20k (estimate 34k), MCP tools 13k (estimate 17k)
-  const exact = CATEGORIES.map(c =>
-    c.name === 'System tools' ? { ...c, tokens: 20_000 } : c.name === 'MCP tools' ? { ...c, tokens: 13_000 } : c,
-  )
-  on('session.usage', (_$, e) => {
-    const u = usage([])
-    if (e.breakdown === 'full') (u.context.breakdown as { categories: unknown }).categories = exact
-    return { value: u }
-  })
-  on('session.start', (_$, e) => ({ cwd: e.cwd }))
-  on('command.register', () => ({ value: { command: 'quota' } }))
-  answerRest(on, [])
-  await $.session.start({ cwd: '.', surface: 'desktop', isInteractive: true })
-  await clock.advance(2_000)
-
-  for (const surface of SURFACES) {
-    const ui = await $.ui.mount({ plugin: 'usage-quota', surface, component: 'AbovePrompt', props: PROPS })
-    // Tools 20k + 13k, exact; Other 11k; Messages 158k - 33k - 11k = 114k
-    expect(await ui.find({ type: 'Text', text: '33k' })).toBeDefined()
-    expect(await ui.find({ type: 'Text', text: '11k' })).toBeDefined()
-    expect(await ui.find({ type: 'Text', text: '114k' })).toBeDefined()
-    await ui.unmount()
-  }
-})
-
 test('the plan limits are asked again every 2 minutes, with the exact count', async ($, on) => {
   const clock = mock.clock(on, { now: NOW })
   mock.store(on)
@@ -435,30 +391,6 @@ test('the back-off is shared: a refusal in one chat holds the others, and Retry-
   answerRestNoPlan(on)
   await $.session.measure(MEASURE)
   expect(asks).toBe(0)
-})
-
-test('after /compact, before any reply, the exact count is shown', async ($, on) => {
-  const clock = mock.clock(on, { now: NOW })
-  mock.store(on)
-  // compacted: no reply yet, so no real total; the estimate says Messages 97k
-  const exact = CATEGORIES.map(c => (c.name === 'Messages' ? { ...c, tokens: 23_000 } : c))
-  on('session.usage', (_$, e) => {
-    const u = usage([])
-    delete (u.context as { tokens?: number }).tokens
-    if (e.breakdown === 'full') (u.context.breakdown as { categories: unknown }).categories = exact
-    return { value: u }
-  })
-  answerRest(on, [])
-  await $.session.measure(MEASURE)
-  await clock.advance(1)
-
-  for (const surface of SURFACES) {
-    const ui = await $.ui.mount({ plugin: 'usage-quota', surface, component: 'AbovePrompt', props: PROPS })
-    // Messages 23k exact; used 23k + 51k + 11k = 85k; free 1M - 85k - 33k buffer
-    expect(await ui.find({ type: 'Text', text: '23k' })).toBeDefined()
-    expect(await ui.find({ type: 'Text', text: '882k free of 1M' })).toBeDefined()
-    await ui.unmount()
-  }
 })
 
 test('one ask for the whole app: a chat opening just after another does not ask again', async ($, on) => {
@@ -564,11 +496,8 @@ test('the arrow collapses the band to one row of three bars, and back', async ($
     // the 5 hour window is not running: its whole length; Weekly resets in 3 days
     expect(times.map(t => t.text)).toEqual(['5h', '3d'])
     for (const t of times) expect(t.props.color).toBe(GREY)
-    expect(await ui.find({ text: 'Context' })).toBeDefined()
-    // and Context with its whole window
-    expect(await ui.find({ type: 'Text', text: '1M' })).toBeDefined()
-    expect(await ui.find({ text: '16%' })).toBeDefined()
-    expect(await ui.find({ text: 'Messages' })).toBeUndefined()
+    // no Context in the row: the limits share it
+    expect(await ui.find({ text: 'Context' })).toBeUndefined()
     expect(await ui.find({ text: /by reset/ })).toBeUndefined()
     // the forecast tick stays on the limit bars
     if (surface === 'desktop') {
@@ -576,7 +505,7 @@ test('the arrow collapses the band to one row of three bars, and back', async ($
       expect(String(weekly?.props.source)).toContain(`fill="${GREEN}"`)
     }
     await ui.press({ key: 'collapse' })
-    expect(await ui.find({ text: 'Messages' })).toBeDefined()
+    expect(await ui.find({ text: '5 Hour' })).toBeDefined()
     await ui.unmount()
   }
 })
@@ -853,11 +782,11 @@ test('a narrow chat stacks the band and wraps its text, nothing cut off or dropp
     // the headline wraps, never truncated
     const head = await ui.find({ type: 'Text', text: /^On track\./ })
     expect(head?.props.wrap).toBe('wrap')
-    for (const text of ['5 Hour', 'Weekly', 'Context', 'Messages', 'Tools', 'Other']) expect(await ui.find({ text })).toBeDefined()
+    for (const text of ['5 Hour', 'Weekly']) expect(await ui.find({ text })).toBeDefined()
     expect(await ui.find({ type: 'Button', label: 'Compact' })).toBeDefined()
     expect((await ui.find({ type: 'Text', text: /^On pace for about/ }))?.props.wrap).toBe('wrap')
     await ui.press({ key: 'collapse' })
-    for (const text of ['5H', 'W', 'Context']) expect(await ui.find({ text })).toBeDefined()
+    for (const text of ['5H', 'W']) expect(await ui.find({ text })).toBeDefined()
     await ui.press({ key: 'collapse' })
     await ui.unmount()
   }
@@ -1167,25 +1096,6 @@ test('a limit bar and its % stay green to 60% used, turn yellow by 70% and red b
     const ui = await $.ui.mount({ plugin: 'usage-quota', surface: 'desktop', component: 'AbovePrompt', props: PROPS })
     expect(await ui.find({ text: /^On track\./ })).toBeDefined()
     expect((await ui.find({ type: 'Text', text: `${percent}%` }))?.props.color).toBe(color)
-    await ui.unmount()
-  }
-})
-
-test('Context stays grey to 25%, turns yellow by 50% and red by 80%', async ($, on) => {
-  const clock = mock.clock(on, { now: NOW })
-  mock.store(on)
-  const state = { percent: 25 }
-  on('session.usage', () => {
-    const u = usage([])
-    return { value: { ...u, context: { ...u.context, percent: state.percent } } }
-  })
-  answerRest(on, [])
-  for (const [percent, color] of [[25, GREY], [35, '#b3a486'], [50, YELLOW], [65, '#d5976f'], [80, RED]] as const) {
-    state.percent = percent
-    await clock.advance(1_000)
-    await $.session.measure(MEASURE)
-    const ui = await $.ui.mount({ plugin: 'usage-quota', surface: 'desktop', component: 'AbovePrompt', props: PROPS })
-    expect((await ui.find({ type: 'Text', text: `${percent}% used` }))?.props.color).toBe(color)
     await ui.unmount()
   }
 })
